@@ -5,8 +5,13 @@ import { createClient } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Edit, Trash2 } from 'lucide-react'
+import { Plus, Edit, Trash2, Upload } from 'lucide-react'
 
 interface Course {
   id: string
@@ -23,14 +28,33 @@ interface Course {
   }
 }
 
+interface Teacher {
+  id: string
+  profile: {
+    full_name: string | null
+  }
+}
+
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
+  const [teachers, setTeachers] = useState<Teacher[]>([])
   const [loading, setLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    teacher_id: '',
+    price: '',
+    image: null as File | null
+  })
 
   const supabase = createClient()
 
   useEffect(() => {
     fetchCourses()
+    fetchTeachers()
   }, [])
 
   const fetchCourses = async () => {
@@ -52,6 +76,115 @@ export default function CoursesPage() {
       toast.error('Failed to load courses')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchTeachers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('teachers')
+        .select(`
+          id,
+          profile:profiles!inner(full_name)
+        `)
+
+      if (error) throw error
+      setTeachers(data || [])
+    } catch (error) {
+      console.error('Error fetching teachers:', error)
+    }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setFormData(prev => ({ ...prev, image: file }))
+  }
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}.${fileExt}`
+      const filePath = `courses/${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('course-images')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        toast.error('Failed to upload image, course will be created without image')
+        return null
+      }
+
+      const { data } = supabase.storage
+        .from('course-images')
+        .getPublicUrl(filePath)
+
+      return data.publicUrl
+    } catch (error) {
+      console.error('Image upload failed:', error)
+      toast.error('Failed to upload image, course will be created without image')
+      return null
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!formData.title.trim()) {
+      toast.error('Course title is required')
+      return
+    }
+
+    setUploading(true)
+
+    try {
+      let imageUrl = null
+
+      if (formData.image) {
+        imageUrl = await uploadImage(formData.image)
+      }
+
+      const courseData = {
+        title: formData.title.trim(),
+        description: formData.description.trim() || null,
+        teacher_id: formData.teacher_id || null,
+        price: formData.price ? parseFloat(formData.price) : null,
+        image_url: imageUrl
+      }
+
+      const { data, error } = await supabase
+        .from('courses')
+        .insert(courseData)
+        .select(`
+          *,
+          teacher:teachers(
+            profile:profiles(full_name)
+          )
+        `)
+        .single()
+
+      if (error) throw error
+
+      setCourses(prev => [data, ...prev])
+      setFormData({
+        title: '',
+        description: '',
+        teacher_id: '',
+        price: '',
+        image: null
+      })
+      setIsDialogOpen(false)
+      toast.success('Course created successfully!')
+    } catch (error) {
+      console.error('Error creating course:', error)
+      toast.error('Failed to create course')
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -91,10 +224,104 @@ export default function CoursesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold">Manage Courses</h2>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Course
-        </Button>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Course
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Create New Course</DialogTitle>
+              <DialogDescription>
+                Add a new course to your learning platform.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="title">Course Title *</Label>
+                <Input
+                  id="title"
+                  value={formData.title}
+                  onChange={(e) => handleInputChange('title', e.target.value)}
+                  placeholder="Enter course title"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleInputChange('description', e.target.value)}
+                  placeholder="Enter course description"
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="teacher">Teacher</Label>
+                <Select value={formData.teacher_id} onValueChange={(value) => handleInputChange('teacher_id', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a teacher" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">No teacher assigned</SelectItem>
+                    {teachers.map((teacher) => (
+                      <SelectItem key={teacher.id} value={teacher.id}>
+                        {teacher.profile.full_name || 'Unnamed Teacher'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="price">Price (USD)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.price}
+                  onChange={(e) => handleInputChange('price', e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="image">Course Image</Label>
+                <Input
+                  id="image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                />
+                {formData.image && (
+                  <p className="text-sm text-muted-foreground">
+                    Selected: {formData.image.name}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDialogOpen(false)}
+                  disabled={uploading}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={uploading}>
+                  {uploading ? 'Creating...' : 'Create Course'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
