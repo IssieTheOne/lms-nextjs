@@ -97,13 +97,17 @@ CREATE TABLE IF NOT EXISTS courses (
   name TEXT NOT NULL,
   description TEXT,
   image_url TEXT,
-  academic_year_id UUID REFERENCES academic_years(id),
-  language_id UUID REFERENCES languages(id),
+  academic_year_id UUID,
+  language_id UUID,
   xp_value INTEGER DEFAULT 100,
-  teacher_id UUID REFERENCES teachers(id),
+  teacher_id UUID,
   is_published BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  -- Add foreign key constraints explicitly
+  CONSTRAINT fk_courses_academic_year FOREIGN KEY (academic_year_id) REFERENCES academic_years(id) ON DELETE SET NULL,
+  CONSTRAINT fk_courses_language FOREIGN KEY (language_id) REFERENCES languages(id) ON DELETE SET NULL,
+  CONSTRAINT fk_courses_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL
 );
 
 -- course_specialties table (many-to-many)
@@ -504,8 +508,41 @@ EXCEPTION WHEN OTHERS THEN
 END $$;
 
 -- ============================================================================
--- OPTIONAL: Sample Data (Uncomment to insert initial data)
+-- INDEXES FOR PERFORMANCE
 -- ============================================================================
+
+-- Courses indexes
+CREATE INDEX IF NOT EXISTS idx_courses_academic_year ON courses(academic_year_id);
+CREATE INDEX IF NOT EXISTS idx_courses_language ON courses(language_id);
+CREATE INDEX IF NOT EXISTS idx_courses_teacher ON courses(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_courses_published ON courses(is_published);
+CREATE INDEX IF NOT EXISTS idx_courses_created_at ON courses(created_at DESC);
+
+-- Sections indexes
+CREATE INDEX IF NOT EXISTS idx_sections_course ON sections(course_id);
+CREATE INDEX IF NOT EXISTS idx_sections_order ON sections(course_id, order_index);
+
+-- Lessons indexes
+CREATE INDEX IF NOT EXISTS idx_lessons_section ON lessons(section_id);
+CREATE INDEX IF NOT EXISTS idx_lessons_order ON lessons(section_id, order_index);
+
+-- Enrollments indexes
+CREATE INDEX IF NOT EXISTS idx_enrollments_student ON enrollments(student_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_course ON enrollments(course_id);
+CREATE INDEX IF NOT EXISTS idx_enrollments_unique ON enrollments(student_id, course_id);
+
+-- Progress indexes
+CREATE INDEX IF NOT EXISTS idx_progress_student ON progress(student_id);
+CREATE INDEX IF NOT EXISTS idx_progress_lesson ON progress(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_progress_completed ON progress(completed);
+
+-- Profiles indexes
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
+
+-- Teachers indexes
+CREATE INDEX IF NOT EXISTS idx_teachers_profile ON teachers(profile_id);
+CREATE INDEX IF NOT EXISTS idx_teachers_active ON teachers(is_active);
 
 -- Insert sample academic years
 -- INSERT INTO academic_years (name, description) VALUES

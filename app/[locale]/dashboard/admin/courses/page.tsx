@@ -288,13 +288,51 @@ export default function CoursesPage() {
         imageUrl = await uploadImage(createFormData.image)
       }
 
+      let teacherId = createFormData.teacher_id
+
+      // If no teacher is selected, create an inactive teacher account for attribution
+      if (!teacherId) {
+        // Create a system teacher profile first
+        const systemTeacherEmail = `system-teacher-${Date.now()}@lms.internal`
+        const systemTeacherName = `Course Creator - ${createFormData.name.substring(0, 20)}`
+
+        // Create profile for system teacher
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            email: systemTeacherEmail,
+            full_name: systemTeacherName,
+            role: 'teacher'
+          })
+          .select()
+          .single()
+
+        if (profileError) throw profileError
+
+        // Create teacher record
+        const { data: teacherData, error: teacherError } = await supabase
+          .from('teachers')
+          .insert({
+            profile_id: profileData.id,
+            bio: 'System-generated teacher account for course attribution',
+            is_active: false // Mark as inactive
+          })
+          .select()
+          .single()
+
+        if (teacherError) throw teacherError
+
+        teacherId = teacherData.id
+        toast.info('Created system teacher account for course attribution')
+      }
+
       const courseData = {
         name: createFormData.name.trim(),
         description: createFormData.description.trim() || null,
         academic_year_id: createFormData.academic_year_id || null,
         language_id: createFormData.language_id || null,
         xp_value: parseInt(createFormData.xp_value) || 100,
-        teacher_id: createFormData.teacher_id || null,
+        teacher_id: teacherId,
         is_published: createFormData.is_published,
         ...(imageUrl && { image_url: imageUrl })
       }
@@ -693,10 +731,10 @@ export default function CoursesPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="teacher">Teacher</Label>
+                  <Label htmlFor="teacher">Teacher (Optional)</Label>
                   <Select value={createFormData.teacher_id} onValueChange={(value) => handleCreateInputChange('teacher_id', value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a teacher (optional)" />
+                      <SelectValue placeholder="Select a teacher or leave empty for auto-assignment" />
                     </SelectTrigger>
                     <SelectContent>
                       {teachers.map((teacher) => (
@@ -706,6 +744,9 @@ export default function CoursesPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    If no teacher is selected, a system teacher account will be created for attribution.
+                  </p>
                 </div>
               </div>
 
