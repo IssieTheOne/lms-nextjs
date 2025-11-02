@@ -36,7 +36,7 @@ export default function SignupPage() {
       if (error) throw error
 
       // Redirect to login or show message to check email
-      router.push('/auth/login?message=Check your email for confirmation')
+      router.push('/en/auth/login?message=Check your email for confirmation')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -89,7 +89,7 @@ export default function SignupPage() {
             </Button>
           </form>
           <div className="mt-4 text-center">
-            <a href="/auth/login" className="text-blue-600 hover:underline">Already have an account? Login</a>
+            <a href="/en/auth/login" className="text-blue-600 hover:underline">Already have an account? Login</a>
           </div>
         </CardContent>
       </Card>

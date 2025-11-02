@@ -7,9 +7,9 @@ export default async function HomePage() {
 
   if (!user) {
     // This should be handled by middleware, but just in case
-    redirect('/auth/login')
+    redirect('/en/auth/login')
   }
 
   // Redirect authenticated users to their dashboard
-  redirect('/dashboard')
+  redirect('/en/dashboard')
 }

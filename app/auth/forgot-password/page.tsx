@@ -22,7 +22,7 @@ export default function ForgotPasswordPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/en/auth/reset-password`,
       })
 
       if (error) throw error
@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
             </Button>
           </form>
           <div className="mt-4 text-center">
-            <a href="/auth/login" className="text-blue-600 hover:underline">Back to login</a>
+            <a href="/en/auth/login" className="text-blue-600 hover:underline">Back to login</a>
           </div>
         </CardContent>
       </Card>

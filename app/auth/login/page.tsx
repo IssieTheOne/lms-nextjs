@@ -29,7 +29,7 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      router.push('/dashboard')
+      router.push('/en/dashboard')
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -72,10 +72,10 @@ export default function LoginPage() {
             </Button>
           </form>
           <div className="mt-4 text-center">
-            <a href="/auth/signup" className="text-blue-600 hover:underline">Don't have an account? Sign up</a>
+            <a href="/en/auth/signup" className="text-blue-600 hover:underline">Don't have an account? Sign up</a>
           </div>
           <div className="mt-2 text-center">
-            <a href="/auth/forgot-password" className="text-blue-600 hover:underline">Forgot password?</a>
+            <a href="/en/auth/forgot-password" className="text-blue-600 hover:underline">Forgot password?</a>
           </div>
         </CardContent>
       </Card>

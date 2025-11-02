@@ -21,7 +21,7 @@ export default function ResetPasswordPage() {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        router.push('/auth/login')
+        router.push('/en/auth/login')
       }
     }
     checkUser()
@@ -43,7 +43,7 @@ export default function ResetPasswordPage() {
 
       if (error) throw error
 
-      router.push('/dashboard')
+      router.push('/en/dashboard')
     } catch (err: any) {
       setError(err.message)
     } finally {

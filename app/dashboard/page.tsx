@@ -6,7 +6,7 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/auth/login')
+    redirect('/en/auth/login')
   }
 
   const { data: profile } = await supabase
@@ -20,12 +20,12 @@ export default async function DashboardPage() {
   // Redirect to role-specific dashboard
   switch (role) {
     case 'admin':
-      redirect('/dashboard/admin')
+      redirect('/en/dashboard/admin')
     case 'teacher':
-      redirect('/dashboard/teacher')
+      redirect('/en/dashboard/teacher')
     case 'parent':
-      redirect('/dashboard/parent')
+      redirect('/en/dashboard/parent')
     default:
-      redirect('/dashboard/student')
+      redirect('/en/dashboard/student')
   }
 }
