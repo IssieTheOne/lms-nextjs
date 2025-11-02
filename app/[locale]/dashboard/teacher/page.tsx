@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function TeacherDashboard() {
@@ -30,6 +31,17 @@ export default function TeacherDashboard() {
           </CardHeader>
           <CardContent>
             <p>No assignments.</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Course Reports</CardTitle>
+            <CardDescription>View detailed reports and analytics for your courses</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/en/dashboard/teacher/reports" className="text-blue-600 hover:underline">
+              View Reports
+            </Link>
           </CardContent>
         </Card>
       </div>

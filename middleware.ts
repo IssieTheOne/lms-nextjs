@@ -48,10 +48,41 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL(`/${locale}/auth/login`, request.url))
   }
 
-  // Redirect authenticated users away from auth pages
-  if (pathname.includes('/auth') && user) {
-    const locale = pathname.split('/')[1] || 'en'
-    return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url))
+  // Protect admin routes - only admins can access
+  if (pathname.includes('/dashboard/admin') && user) {
+    // Get user profile to check role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.role !== 'admin') {
+      const locale = pathname.split('/')[1] || 'en'
+      return NextResponse.redirect(new URL(`/${locale}/dashboard`, request.url))
+    }
+  }
+
+  // Redirect parents to parent dashboard, students to student dashboard
+  if (pathname.match(/^\/(en|fr|ar)\/dashboard$/) && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const role = profile?.role || 'student'
+    const locale = pathname.split('/')[1]
+
+    if (role === 'parent') {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard/parent`, request.url))
+    } else if (role === 'student') {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard/student`, request.url))
+    } else if (role === 'teacher') {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard/teacher`, request.url))
+    } else if (role === 'admin') {
+      return NextResponse.redirect(new URL(`/${locale}/dashboard/admin`, request.url))
+    }
   }
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're

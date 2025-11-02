@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { LogoutButton } from '@/components/logout-button'
+import FloatingAIChat from '@/components/floating-ai-chat'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -46,6 +47,7 @@ export default async function DashboardLayout({
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         {children}
       </main>
+      <FloatingAIChat context={{ userRole: role }} />
     </div>
   )
 }
