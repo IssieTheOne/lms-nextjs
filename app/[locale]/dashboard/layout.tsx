@@ -1,17 +1,23 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 import { ThemeToggle } from '@/components/theme-toggle'
+import { LogoutButton } from '@/components/logout-button'
+
+interface DashboardLayoutProps {
+  children: React.ReactNode
+  params: Promise<{ locale: string }>
+}
 
 export default async function DashboardLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
+  params,
+}: DashboardLayoutProps) {
+  const { locale } = await params
   const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    redirect('/auth/login')
+    redirect(`/${locale}/auth/login`)
   }
 
   // Get user profile
@@ -32,7 +38,7 @@ export default async function DashboardLayout({
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-500 dark:text-gray-400">Role: {role}</span>
               <ThemeToggle />
-              <button className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-white">Logout</button>
+              <LogoutButton locale={locale} />
             </div>
           </div>
         </div>
