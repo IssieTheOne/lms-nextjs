@@ -1,31 +1,41 @@
-import { createServerSupabaseClient } from '@/lib/supabase-server'
+import { createClient } from '@/lib/supabase'
 import { redirect } from 'next/navigation'
+import { useEffect } from 'react'
 
-export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient()
-  const { data: { user } } = await supabase.auth.getUser()
+export default function DashboardPage() {
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/en/auth/login')
-  }
+      if (!user) {
+        redirect('/en/auth/login')
+        return
+      }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
 
-  const role = profile?.role || 'student'
+      const role = profile?.role || 'student'
 
-  // Redirect to role-specific dashboard
-  switch (role) {
-    case 'admin':
-      redirect('/en/dashboard/admin')
-    case 'teacher':
-      redirect('/en/dashboard/teacher')
-    case 'parent':
-      redirect('/en/dashboard/parent')
-    default:
-      redirect('/en/dashboard/student')
-  }
+      // Redirect to role-specific dashboard
+      switch (role) {
+        case 'admin':
+          redirect('/en/dashboard/admin')
+        case 'teacher':
+          redirect('/en/dashboard/teacher')
+        case 'parent':
+          redirect('/en/dashboard/parent')
+        default:
+          redirect('/en/dashboard/student')
+      }
+    }
+
+    fetchProfile()
+  }, [])
+
+  return <div>Redirecting...</div>
 }
