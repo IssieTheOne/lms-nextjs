@@ -1,6 +1,6 @@
 # LMS SaaS
 
-A full-stack Learning Management System built with Next.js 14, Supabase, Cloudflare R2, and MailerSend.
+A full-stack Learning Management System built with Next.js 16, Supabase, Cloudflare R2, and MailerSend.
 
 ## Features
 
@@ -10,10 +10,11 @@ A full-stack Learning Management System built with Next.js 14, Supabase, Cloudfl
 - Multi-language support (EN/FR/AR)
 - Dark/Light theme
 - Email notifications
+- File uploads to Cloudflare R2
 
 ## Tech Stack
 
-- Frontend: Next.js 14 + TypeScript + Tailwind CSS + shadcn/ui
+- Frontend: Next.js 16 + TypeScript + Tailwind CSS + shadcn/ui
 - Backend: Supabase (Auth, Database, Storage)
 - Storage: Cloudflare R2
 - Email: MailerSend
@@ -42,5 +43,7 @@ Copy `.env.local.example` to `.env.local` and fill in the values:
 Run the SQL in `supabase/schema.sql` in your Supabase dashboard.
 
 ## Deployment
+
+The project is deployed on Vercel and accessible at: [Your Vercel URL]
 
 Deploy to Vercel with the GitHub integration.
