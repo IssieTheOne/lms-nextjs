@@ -1,17 +1,19 @@
 "use client"
 
 import { createClient } from '@/lib/supabase'
-import { redirect } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 
 export default function DashboardPage() {
+  const router = useRouter()
+
   useEffect(() => {
     const fetchProfile = async () => {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
-        redirect('/en/auth/login')
+        router.push('/en/auth/login')
         return
       }
 
@@ -26,18 +28,22 @@ export default function DashboardPage() {
       // Redirect to role-specific dashboard
       switch (role) {
         case 'admin':
-          redirect('/en/dashboard/admin')
+          router.push('/en/dashboard/admin')
+          break
         case 'teacher':
-          redirect('/en/dashboard/teacher')
+          router.push('/en/dashboard/teacher')
+          break
         case 'parent':
-          redirect('/en/dashboard/parent')
+          router.push('/en/dashboard/parent')
+          break
         default:
-          redirect('/en/dashboard/student')
+          router.push('/en/dashboard/student')
+          break
       }
     }
 
     fetchProfile()
-  }, [])
+  }, [router])
 
   return <div>Redirecting...</div>
 }
