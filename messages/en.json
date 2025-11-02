@@ -1,0 +1,25 @@
+{
+  "auth": {
+    "login": "Login",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "sendResetLink": "Send Reset Link",
+    "updatePassword": "Update Password",
+    "backToLogin": "Back to Login",
+    "noAccount": "Don't have an account? Sign up",
+    "haveAccount": "Already have an account? Login"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "admin": "Admin Dashboard",
+    "student": "Student Dashboard",
+    "teacher": "Teacher Dashboard",
+    "parent": "Parent Dashboard",
+    "logout": "Logout",
+    "role": "Role"
+  }
+}

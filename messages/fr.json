@@ -1,0 +1,25 @@
+{
+  "auth": {
+    "login": "Connexion",
+    "signup": "S'inscrire",
+    "email": "Email",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "forgotPassword": "Mot de passe oublié?",
+    "resetPassword": "Réinitialiser le mot de passe",
+    "sendResetLink": "Envoyer le lien de réinitialisation",
+    "updatePassword": "Mettre à jour le mot de passe",
+    "backToLogin": "Retour à la connexion",
+    "noAccount": "Pas de compte? S'inscrire",
+    "haveAccount": "Déjà un compte? Se connecter"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "admin": "Tableau de bord Admin",
+    "student": "Tableau de bord Étudiant",
+    "teacher": "Tableau de bord Enseignant",
+    "parent": "Tableau de bord Parent",
+    "logout": "Déconnexion",
+    "role": "Rôle"
+  }
+}
