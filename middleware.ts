@@ -37,8 +37,13 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Redirect root page to login for unauthenticated users
-  if (pathname === '/' && !user) {
+  // Redirect root page to default locale
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/en', request.url))
+  }
+
+  // Redirect root locale page to login for unauthenticated users
+  if (pathname === '/en' && !user) {
     return NextResponse.redirect(new URL('/en/auth/login', request.url))
   }
 
