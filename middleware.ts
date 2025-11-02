@@ -37,6 +37,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // Redirect root page to login for unauthenticated users
+  if (pathname === '/' && !user) {
+    return NextResponse.redirect(new URL('/auth/login', request.url))
+  }
+
   // Protect dashboard routes
   if (pathname.startsWith('/dashboard') && !user) {
     return NextResponse.redirect(new URL('/auth/login', request.url))
