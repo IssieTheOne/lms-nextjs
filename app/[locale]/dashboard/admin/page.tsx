@@ -12,7 +12,7 @@ export default function AdminDashboard() {
             <CardDescription>Manage users, roles, and permissions</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="users" className="text-blue-600 hover:underline">
+            <Link href="/en/dashboard/admin/users" className="text-blue-600 hover:underline">
               Manage Users
             </Link>
           </CardContent>
@@ -23,7 +23,7 @@ export default function AdminDashboard() {
             <CardDescription>Create and manage courses</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="courses" className="text-blue-600 hover:underline">
+            <Link href="/en/dashboard/admin/courses" className="text-blue-600 hover:underline">
               Manage Courses
             </Link>
           </CardContent>
@@ -34,7 +34,7 @@ export default function AdminDashboard() {
             <CardDescription>View analytics and reports</CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="reports" className="text-blue-600 hover:underline">
+            <Link href="/en/dashboard/admin/reports" className="text-blue-600 hover:underline">
               View Reports
             </Link>
           </CardContent>

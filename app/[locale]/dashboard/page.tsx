@@ -12,26 +12,18 @@ export default function DashboardPage() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      console.log('User:', user)
-      console.log('User ID:', user?.id)
-
       if (!user) {
         router.push('/en/auth/login')
         return
       }
 
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single()
 
-      console.log('Profile query error:', error)
-      console.log('Profile data:', profile)
-
       const role = profile?.role || 'student'
-
-      console.log('Final role:', role)
 
       // Redirect to role-specific dashboard
       switch (role) {
