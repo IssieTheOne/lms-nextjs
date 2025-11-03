@@ -11,14 +11,14 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
-import { Plus, Edit, Trash2, Upload, BookOpen, Users, Clock, Award, ChevronRight, GripVertical, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Upload, BookOpen, Users, Clock, Award, ChevronRight, GripVertical, X, GraduationCap, Target, Settings } from 'lucide-react'
 
 interface Course {
   id: string
   name: string
   description: string | null
   image_url: string | null
-  academic_year_id: string | null
+  study_level_id: string | null
   language_id: string | null
   xp_value: number
   teacher_id: string | null
@@ -26,24 +26,26 @@ interface Course {
   created_at: string
   updated_at: string
   teacher?: {
-    profile: {
+    id: string
+    name?: string | null
+    profile?: {
       full_name: string | null
-    }
-  }
-  academic_year?: {
+    } | null
+  } | null
+  study_level?: {
     name: string
-  }
+  } | null
   language?: {
     name: string
     code: string
-  }
+  } | null
   specialties?: Array<{
     specialty: {
       id: string
       name: string
     }
   }>
-  sections?: Section[]
+  sections?: Section[] | null
 }
 
 interface Section {
@@ -69,14 +71,10 @@ interface Lesson {
 
 interface Teacher {
   id: string
-  profile: {
+  profile?: {
     full_name: string | null
-  }
-}
-
-interface AcademicYear {
-  id: string
-  name: string
+  } | null
+  name?: string | null
 }
 
 interface Language {
@@ -91,10 +89,17 @@ interface Specialty {
   language_id: string
 }
 
+interface StudyLevel {
+  id: string
+  name: string
+  description?: string | null
+  order_index: number
+}
+
 export default function CoursesPage() {
   const [courses, setCourses] = useState<Course[]>([])
   const [teachers, setTeachers] = useState<Teacher[]>([])
-  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([])
+  const [studyLevels, setStudyLevels] = useState<StudyLevel[]>([])
   const [languages, setLanguages] = useState<Language[]>([])
   const [specialties, setSpecialties] = useState<Specialty[]>([])
   const [loading, setLoading] = useState(true)
@@ -106,11 +111,12 @@ export default function CoursesPage() {
   const [createFormData, setCreateFormData] = useState({
     name: '',
     description: '',
-    academic_year_id: '',
+    study_level_id: '',
     language_id: '',
     specialty_ids: [] as string[],
     xp_value: '100',
-    teacher_id: '',
+    teacher_id: '', // For selecting existing teacher
+    teacher_name: '', // For entering new teacher name
     is_published: false,
     image: null as File | null
   })
@@ -122,46 +128,84 @@ export default function CoursesPage() {
   const supabase = createClient()
 
   useEffect(() => {
+    console.log('Component mounted, fetching data...')
     fetchCourses()
     fetchTeachers()
-    fetchAcademicYears()
+    fetchStudyLevels()
     fetchLanguages()
     fetchSpecialties()
   }, [])
 
   const fetchCourses = async () => {
     try {
+      console.log('Fetching courses...')
       const { data, error } = await supabase
         .from('courses')
         .select(`
           *,
-          teacher:teachers(
-            profile:profiles(full_name)
+          teacher:teachers!fk_courses_teacher(
+            id,
+            name,
+            profile:profiles(id, full_name)
           ),
-          academic_year:academic_years(name),
-          language:languages(name, code),
-          specialties:course_specialties(
+          study_level:study_levels!fk_courses_study_level(id, name),
+          language:languages!fk_courses_language(id, name, code),
+          course_specialties(
             specialty:specialties(id, name)
           ),
           sections:sections(
             id,
             title,
-            description,
-            order_index,
-            lessons:lessons(
-              id,
-              title,
-              order_index,
-              xp_value
-            )
+            order_index
           )
         `)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
-      setCourses(data || [])
+      if (error) {
+        console.error('Supabase error fetching courses:', error)
+        console.error('Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+
+        // If the error is about missing relationships, try a simpler query
+        if (error.code === 'PGRST200' && error.message.includes('relationship')) {
+          console.log('Trying simpler query without joins...')
+          const { data: simpleData, error: simpleError } = await supabase
+            .from('courses')
+            .select('*')
+            .order('created_at', { ascending: false })
+
+          if (simpleError) {
+            console.error('Even simple query failed:', simpleError)
+            throw simpleError
+          }
+
+          console.log('Simple query succeeded, courses fetched:', simpleData?.length || 0)
+          setCourses(simpleData || [])
+          return
+        }
+
+        throw error
+      }
+
+      console.log('Courses fetched successfully:', data?.length || 0, 'courses')
+
+      // Transform the data to match expected structure
+      const transformedData = data?.map(course => ({
+        ...course,
+        specialties: course.course_specialties?.map((cs: any) => ({
+          specialty: cs.specialty
+        })) || []
+      })) || []
+
+      setCourses(transformedData)
     } catch (error) {
       console.error('Error fetching courses:', error)
+      console.error('Error type:', typeof error)
+      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace')
       toast.error('Failed to load courses')
     } finally {
       setLoading(false)
@@ -174,6 +218,7 @@ export default function CoursesPage() {
         .from('teachers')
         .select(`
           id,
+          name,
           profiles!teachers_profile_id_fkey(full_name)
         `)
 
@@ -181,6 +226,7 @@ export default function CoursesPage() {
 
       const transformedData = data?.map(item => ({
         id: item.id,
+        name: item.name,
         profile: {
           full_name: (item.profiles as any)?.full_name || null
         }
@@ -192,17 +238,17 @@ export default function CoursesPage() {
     }
   }
 
-  const fetchAcademicYears = async () => {
+  const fetchStudyLevels = async () => {
     try {
       const { data, error } = await supabase
-        .from('academic_years')
-        .select('id, name')
-        .order('name')
+        .from('study_levels')
+        .select('id, name, order_index')
+        .order('order_index')
 
       if (error) throw error
-      setAcademicYears(data || [])
+      setStudyLevels(data || [])
     } catch (error) {
-      console.error('Error fetching academic years:', error)
+      console.error('Error fetching study levels:', error)
     }
   }
 
@@ -279,6 +325,16 @@ export default function CoursesPage() {
       return
     }
 
+    if (!createFormData.study_level_id) {
+      toast.error('Study level is required')
+      return
+    }
+
+    if (!createFormData.language_id) {
+      toast.error('Language is required')
+      return
+    }
+
     setUploading(true)
 
     try {
@@ -290,32 +346,15 @@ export default function CoursesPage() {
 
       let teacherId = createFormData.teacher_id
 
-      // If no teacher is selected, create an inactive teacher account for attribution
-      if (!teacherId) {
-        // Create a system teacher profile first
-        const systemTeacherEmail = `system-teacher-${Date.now()}@lms.internal`
-        const systemTeacherName = `Course Creator - ${createFormData.name.substring(0, 20)}`
-
-        // Create profile for system teacher
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            email: systemTeacherEmail,
-            full_name: systemTeacherName,
-            role: 'teacher'
-          })
-          .select()
-          .single()
-
-        if (profileError) throw profileError
-
-        // Create teacher record
+      // If teacher name is provided instead of selecting existing teacher, create new teacher
+      if (!createFormData.teacher_id && createFormData.teacher_name.trim()) {
+        // Create teacher record with name but no profile
         const { data: teacherData, error: teacherError } = await supabase
           .from('teachers')
           .insert({
-            profile_id: profileData.id,
-            bio: 'System-generated teacher account for course attribution',
-            is_active: false // Mark as inactive
+            name: createFormData.teacher_name.trim(),
+            bio: 'Teacher account created during course creation',
+            is_active: false // Mark as inactive until admin enables
           })
           .select()
           .single()
@@ -323,13 +362,43 @@ export default function CoursesPage() {
         if (teacherError) throw teacherError
 
         teacherId = teacherData.id
-        toast.info('Created system teacher account for course attribution')
+        toast.success(`Created teacher account for ${createFormData.teacher_name.trim()}`)
+      } else if (!createFormData.teacher_id) {
+        // No teacher selected, use default system teacher
+        const systemTeacherName = 'System Administrator'
+
+        // Check if default system teacher exists
+        const { data: existingSystemTeacher } = await supabase
+          .from('teachers')
+          .select('id')
+          .eq('name', systemTeacherName)
+          .single()
+
+        if (existingSystemTeacher) {
+          teacherId = existingSystemTeacher.id
+        } else {
+          // Create the default system teacher
+          const { data: teacherData, error: teacherError } = await supabase
+            .from('teachers')
+            .insert({
+              name: systemTeacherName,
+              bio: 'Default system teacher for course attribution',
+              is_active: false
+            })
+            .select()
+            .single()
+
+          if (teacherError) throw teacherError
+
+          teacherId = teacherData.id
+          toast.info('Using default system teacher')
+        }
       }
 
       const courseData = {
         name: createFormData.name.trim(),
         description: createFormData.description.trim() || null,
-        academic_year_id: createFormData.academic_year_id || null,
+        study_level_id: createFormData.study_level_id || null,
         language_id: createFormData.language_id || null,
         xp_value: parseInt(createFormData.xp_value) || 100,
         teacher_id: teacherId,
@@ -342,11 +411,13 @@ export default function CoursesPage() {
         .insert(courseData)
         .select(`
           *,
-          teacher:teachers(
+          teacher:teachers!fk_courses_teacher(
+            id,
+            name,
             profile:profiles(full_name)
           ),
-          academic_year:academic_years(name),
-          language:languages(name, code)
+          study_level:study_levels!fk_courses_study_level(name),
+          language:languages!fk_courses_language(name, code)
         `)
         .single()
 
@@ -371,11 +442,12 @@ export default function CoursesPage() {
       setCreateFormData({
         name: '',
         description: '',
-        academic_year_id: '',
+        study_level_id: '',
         language_id: '',
         specialty_ids: [],
         xp_value: '100',
-        teacher_id: '',
+        teacher_id: '', // Changed back to teacher_id
+        teacher_name: '', // For new teacher name
         is_published: false,
         image: null
       })
@@ -620,178 +692,349 @@ export default function CoursesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold">Course Builder</h2>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Course
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Create New Course</DialogTitle>
-              <DialogDescription>
-                Set up the basic information for your course. You'll be able to add content after creation.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreateCourse} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Course Name *</Label>
-                <Input
-                  id="name"
-                  value={createFormData.name}
-                  onChange={(e) => handleCreateInputChange('name', e.target.value)}
-                  placeholder="Enter course name"
-                  required
-                />
-              </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              console.log('Manual refresh triggered')
+              fetchStudyLevels()
+              fetchLanguages()
+              fetchSpecialties()
+            }}
+          >
+            🔄 Refresh Data
+          </Button>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Course
+          </Button>
+        </div>
+      </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={createFormData.description}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => handleCreateInputChange('description', e.target.value)}
-                  placeholder="Enter course description"
-                  rows={3}
-                />
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Course</DialogTitle>
+            <DialogDescription>
+              Set up the basic information for your course. You'll be able to add content after creation.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateCourse} className="space-y-4">
+            {/* Course Basic Info - Compact */}
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold">Course Information</h3>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="academic_year">Academic Year</Label>
-                  <Select value={createFormData.academic_year_id} onValueChange={(value) => handleCreateInputChange('academic_year_id', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select academic year" />
+                  <Label htmlFor="name" className="text-sm font-medium">Course Name *</Label>
+                  <Input
+                    id="name"
+                    value={createFormData.name}
+                    onChange={(e) => handleCreateInputChange('name', e.target.value)}
+                    placeholder="e.g., Mathematics 7ème Année"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description" className="text-sm font-medium">Description</Label>
+                  <Input
+                    id="description"
+                    value={createFormData.description}
+                    onChange={(e) => handleCreateInputChange('description', e.target.value)}
+                    placeholder="Brief course description"
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Moroccan Education Structure - Compact */}
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <GraduationCap className="h-5 w-5 text-green-600" />
+                <h3 className="text-lg font-semibold">Moroccan Education Structure</h3>
+                <Badge variant="outline" className="text-xs">🇲🇦</Badge>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Study Level Selection */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <Label htmlFor="study_level" className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      Study Level *
+                    </Label>
+                  </div>
+                  <Select value={createFormData.study_level_id} onValueChange={(value) => handleCreateInputChange('study_level_id', value)}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select level" />
                     </SelectTrigger>
                     <SelectContent>
-                      {academicYears.map((year) => (
-                        <SelectItem key={year.id} value={year.id}>
-                          {year.name}
+                      {studyLevels.length === 0 ? (
+                        <SelectItem value="no-levels" disabled>
+                          No study levels available
                         </SelectItem>
-                      ))}
+                      ) : (
+                        studyLevels.map((level) => (
+                          <SelectItem key={level.id} value={level.id} className="py-2">
+                            <div className="flex flex-col">
+                              <span className="font-medium text-sm">{level.name}</span>
+                              {level.description && (
+                                <span className="text-xs text-muted-foreground">{level.description}</span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Language Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="language">Language</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <Label htmlFor="language" className="text-sm font-medium text-green-700 dark:text-green-300">
+                      Teaching Language *
+                    </Label>
+                  </div>
                   <Select value={createFormData.language_id} onValueChange={(value) => handleCreateInputChange('language_id', value)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-9">
                       <SelectValue placeholder="Select language" />
                     </SelectTrigger>
                     <SelectContent>
                       {languages.map((language) => (
-                        <SelectItem key={language.id} value={language.id}>
-                          {language.name} ({language.code})
+                        <SelectItem key={language.id} value={language.id} className="py-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              language.code === 'ar' ? 'bg-red-500' :
+                              language.code === 'biof' ? 'bg-blue-500' :
+                              'bg-purple-500'
+                            }`}></div>
+                            <span className="font-medium text-sm">{language.name}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
+            </Card>
 
-              <div className="space-y-2">
-                <Label htmlFor="specialties">Specialties</Label>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {specialties
-                    .filter(specialty => specialty.language_id === createFormData.language_id)
-                    .map((specialty) => (
-                      <div key={specialty.id} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`specialty-${specialty.id}`}
-                          checked={createFormData.specialty_ids.includes(specialty.id)}
-                          onChange={(e) => {
-                            const checked = e.target.checked
-                            const currentIds = createFormData.specialty_ids
-                            const newIds = checked
-                              ? [...currentIds, specialty.id]
-                              : currentIds.filter(id => id !== specialty.id)
-                            handleCreateInputChange('specialty_ids', newIds)
-                          }}
-                        />
-                        <Label htmlFor={`specialty-${specialty.id}`}>{specialty.name}</Label>
+            {/* Specialties and Settings - Compact */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Specialties Selection */}
+              {createFormData.language_id && (
+                <Card className="p-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-purple-600" />
+                      <Label className="text-sm font-medium text-purple-700 dark:text-purple-300">
+                        Academic Specialties
+                      </Label>
+                      <Badge variant="secondary" className="text-xs">
+                        {specialties.filter(s => s.language_id === createFormData.language_id).length}
+                      </Badge>
+                    </div>
+
+                    <div className="max-h-32 overflow-y-auto space-y-2">
+                      {specialties
+                        .filter(specialty => specialty.language_id === createFormData.language_id)
+                        .map((specialty) => (
+                          <div key={specialty.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`specialty-${specialty.id}`}
+                              checked={createFormData.specialty_ids.includes(specialty.id)}
+                              onChange={(e) => {
+                                const checked = e.target.checked
+                                const currentIds = createFormData.specialty_ids
+                                const newIds = checked
+                                  ? [...currentIds, specialty.id]
+                                  : currentIds.filter(id => id !== specialty.id)
+                                handleCreateInputChange('specialty_ids', newIds)
+                              }}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <Label
+                              htmlFor={`specialty-${specialty.id}`}
+                              className="text-sm cursor-pointer flex-1"
+                            >
+                              {specialty.name}
+                            </Label>
+                          </div>
+                        ))}
+                    </div>
+
+                    {specialties.filter(s => s.language_id === createFormData.language_id).length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        No specialties available
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Course Settings */}
+              <Card className="p-4">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Settings className="h-4 w-4 text-orange-600" />
+                    <h4 className="text-sm font-semibold">Course Settings</h4>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-muted-foreground" />
+                      <Label htmlFor="xp_value" className="text-sm">XP Value</Label>
+                      <Input
+                        id="xp_value"
+                        type="number"
+                        value={createFormData.xp_value}
+                        onChange={(e) => handleCreateInputChange('xp_value', e.target.value)}
+                        placeholder="100"
+                        min="0"
+                        className="w-20 h-8"
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <Label className="text-sm font-medium">Teacher Assignment</Label>
+
+                      {/* Existing Teacher Dropdown */}
+                      <div className="space-y-2">
+                        <Label htmlFor="teacher_id" className="text-xs text-muted-foreground">
+                          Select existing teacher (optional)
+                        </Label>
+                        <Select value={createFormData.teacher_id} onValueChange={(value) => handleCreateInputChange('teacher_id', value)}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Select existing teacher (optional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {teachers.length === 0 ? (
+                              <SelectItem value="no-teachers" disabled>
+                                No teachers available
+                              </SelectItem>
+                            ) : (
+                              teachers.map((teacher) => (
+                                <SelectItem key={teacher.id} value={teacher.id} className="py-2">
+                                  <span className="font-medium text-sm">
+                                    {teacher.profile?.full_name || teacher.name || 'Unnamed Teacher'}
+                                  </span>
+                                </SelectItem>
+                              ))
+                            )}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    ))}
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="xp_value">XP Value</Label>
+                      {/* OR Divider */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-px bg-border"></div>
+                        <span className="text-xs text-muted-foreground px-2">OR</span>
+                        <div className="flex-1 h-px bg-border"></div>
+                      </div>
+
+                      {/* New Teacher Name Input */}
+                      <div className="space-y-2">
+                        <Label htmlFor="teacher_name" className="text-xs text-muted-foreground">
+                          Enter new teacher name
+                        </Label>
+                        <Input
+                          id="teacher_name"
+                          value={createFormData.teacher_name}
+                          onChange={(e) => handleCreateInputChange('teacher_name', e.target.value)}
+                          placeholder="e.g., Dr. Ahmed Bennani"
+                          className="h-9"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Leave both fields empty to use the default System Administrator teacher
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="is_published" className="text-sm cursor-pointer">
+                        Publish Course
+                      </Label>
+                      <input
+                        type="checkbox"
+                        id="is_published"
+                        checked={createFormData.is_published}
+                        onChange={(e) => handleCreateInputChange('is_published', e.target.checked)}
+                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Image Upload */}
+            <Card className="p-4">
+              <div className="space-y-3">
+                <Label htmlFor="image" className="text-sm font-medium">Course Image (Optional)</Label>
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
+                  <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-2" />
                   <Input
-                    id="xp_value"
-                    type="number"
-                    value={createFormData.xp_value}
-                    onChange={(e) => handleCreateInputChange('xp_value', e.target.value)}
-                    placeholder="100"
-                    min="0"
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCreateFileChange}
+                    className="hidden"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="teacher">Teacher (Optional)</Label>
-                  <Select value={createFormData.teacher_id} onValueChange={(value) => handleCreateInputChange('teacher_id', value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a teacher or leave empty for auto-assignment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachers.map((teacher) => (
-                        <SelectItem key={teacher.id} value={teacher.id}>
-                          {teacher.profile.full_name || 'Unnamed Teacher'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    If no teacher is selected, a system teacher account will be created for attribution.
-                  </p>
+                  <Label htmlFor="image" className="cursor-pointer">
+                    <span className="text-sm font-medium text-blue-600 hover:text-blue-700">
+                      Click to upload image
+                    </span>
+                    <span className="text-xs text-muted-foreground block mt-1">
+                      PNG, JPG up to 5MB
+                    </span>
+                  </Label>
+                  {createFormData.image && (
+                    <div className="mt-2 p-2 bg-green-50 dark:bg-green-950 rounded border border-green-200 dark:border-green-800">
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        ✓ {createFormData.image.name}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
+            </Card>
 
-              <div className="space-y-2">
-                <Label htmlFor="image">Course Image</Label>
-                <Input
-                  id="image"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleCreateFileChange}
-                />
-                {createFormData.image && (
-                  <p className="text-sm text-muted-foreground">
-                    Selected: {createFormData.image.name}
-                  </p>
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-2 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateDialogOpen(false)}
+                disabled={uploading}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={uploading}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+              >
+                {uploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Creating Course...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Course
+                  </>
                 )}
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="is_published"
-                  checked={createFormData.is_published}
-                  onChange={(e) => handleCreateInputChange('is_published', e.target.checked)}
-                />
-                <Label htmlFor="is_published">Publish course (make visible to students)</Label>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                  disabled={uploading}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={uploading}>
-                  {uploading ? 'Creating...' : 'Create Course'}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {courses.length === 0 ? (
@@ -833,8 +1076,9 @@ export default function CoursesPage() {
                   </div>
 
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>Level: {course.study_level?.name || 'Not set'}</span>
                     <span>Language: {course.language?.name || 'Not set'}</span>
-                    <span>Teacher: {course.teacher?.profile?.full_name || 'Unassigned'}</span>
+                    <span>Teacher: {course.teacher?.name || course.teacher?.profile?.full_name || 'Unassigned'}</span>
                   </div>
 
                   {course.specialties && course.specialties.length > 0 && (

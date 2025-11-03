@@ -42,6 +42,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/en', request.url))
   }
 
+  // Handle dashboard routes without locale prefix
+  if (pathname.startsWith('/dashboard') && !pathname.startsWith('/en/') && !pathname.startsWith('/fr/') && !pathname.startsWith('/ar/')) {
+    return NextResponse.redirect(new URL(`/en${pathname}`, request.url))
+  }
+
   // Protect dashboard routes
   if (pathname.includes('/dashboard') && !user) {
     const locale = pathname.split('/')[1] || 'en'

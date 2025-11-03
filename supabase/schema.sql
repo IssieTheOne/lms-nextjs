@@ -57,11 +57,21 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- academic_years table
-CREATE TABLE IF NOT EXISTS academic_years (
+-- grades table (educational grades like 1st year, 2nd year, etc.)
+CREATE TABLE IF NOT EXISTS grades (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   description TEXT,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- study_levels table (educational levels like Tronc Commun, 1st Year BAC, etc.)
+CREATE TABLE IF NOT EXISTS study_levels (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  order_index INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -85,6 +95,7 @@ CREATE TABLE IF NOT EXISTS specialties (
 CREATE TABLE IF NOT EXISTS teachers (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   profile_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  name TEXT, -- Allow storing teacher name directly for system teachers
   bio TEXT,
   subjects TEXT[],
   is_active BOOLEAN DEFAULT FALSE,
@@ -97,7 +108,7 @@ CREATE TABLE IF NOT EXISTS courses (
   name TEXT NOT NULL,
   description TEXT,
   image_url TEXT,
-  academic_year_id UUID,
+  study_level_id UUID,
   language_id UUID,
   xp_value INTEGER DEFAULT 100,
   teacher_id UUID,
@@ -105,7 +116,7 @@ CREATE TABLE IF NOT EXISTS courses (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   -- Add foreign key constraints explicitly
-  CONSTRAINT fk_courses_academic_year FOREIGN KEY (academic_year_id) REFERENCES academic_years(id) ON DELETE SET NULL,
+  CONSTRAINT fk_courses_study_level FOREIGN KEY (study_level_id) REFERENCES study_levels(id) ON DELETE SET NULL,
   CONSTRAINT fk_courses_language FOREIGN KEY (language_id) REFERENCES languages(id) ON DELETE SET NULL,
   CONSTRAINT fk_courses_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE SET NULL
 );
@@ -199,87 +210,123 @@ CREATE TABLE IF NOT EXISTS parent_student_links (
 );
 
 -- ============================================================================
--- FIX FOR EXISTING DATABASE: Add missing columns
+-- QUICK FIX: Add missing name column to teachers table
 -- ============================================================================
 
--- Add is_published column to courses table if it doesn't exist
+-- Add name column to teachers table if it doesn't exist
+ALTER TABLE teachers ADD COLUMN IF NOT EXISTS name TEXT;
+
+-- ============================================================================
+-- IMMEDIATE COLUMN ADDITIONS (run before any other operations)
+-- ============================================================================
+
+-- Check if profiles table exists and add missing columns
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'courses' AND column_name = 'is_published') THEN
-    ALTER TABLE courses ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
+  -- Only add columns if the table exists
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'profiles' AND table_schema = 'public') THEN
+    -- Add is_active column to profiles table if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'is_active') THEN
+      ALTER TABLE profiles ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+      RAISE NOTICE 'Added is_active column to profiles table';
+    END IF;
+
+    -- Add is_archived column to profiles table if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'is_archived') THEN
+      ALTER TABLE profiles ADD COLUMN is_archived BOOLEAN DEFAULT FALSE;
+      RAISE NOTICE 'Added is_archived column to profiles table';
+    END IF;
+
+    -- Add updated_at to profiles if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'updated_at') THEN
+      ALTER TABLE profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+      RAISE NOTICE 'Added updated_at column to profiles table';
+    END IF;
   END IF;
 END $$;
 
--- Add missing columns to quizzes table if they don't exist
+-- Add missing columns to other tables (only if tables exist)
 DO $$
 BEGIN
-  -- Add section_id column if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'quizzes' AND column_name = 'section_id') THEN
-    ALTER TABLE quizzes ADD COLUMN section_id UUID REFERENCES sections(id) ON DELETE CASCADE;
+  -- Courses table
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'courses' AND table_schema = 'public') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'is_published') THEN
+      ALTER TABLE courses ADD COLUMN is_published BOOLEAN DEFAULT FALSE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'study_level_id') THEN
+      ALTER TABLE courses ADD COLUMN study_level_id UUID REFERENCES study_levels(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'language_id') THEN
+      ALTER TABLE courses ADD COLUMN language_id UUID REFERENCES languages(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'xp_value') THEN
+      ALTER TABLE courses ADD COLUMN xp_value INTEGER DEFAULT 100;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'teacher_id') THEN
+      ALTER TABLE courses ADD COLUMN teacher_id UUID REFERENCES teachers(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'created_at') THEN
+      ALTER TABLE courses ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'courses' AND column_name = 'updated_at') THEN
+      ALTER TABLE courses ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
   END IF;
 
-  -- Add title column if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'quizzes' AND column_name = 'title') THEN
-    ALTER TABLE quizzes ADD COLUMN title TEXT NOT NULL DEFAULT 'Untitled Quiz';
+  -- Quizzes table
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'quizzes' AND table_schema = 'public') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quizzes' AND column_name = 'section_id') THEN
+      ALTER TABLE quizzes ADD COLUMN section_id UUID REFERENCES sections(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quizzes' AND column_name = 'title') THEN
+      ALTER TABLE quizzes ADD COLUMN title TEXT NOT NULL DEFAULT 'Untitled Quiz';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quizzes' AND column_name = 'data') THEN
+      ALTER TABLE quizzes ADD COLUMN data JSONB;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'quizzes' AND column_name = 'created_at') THEN
+      ALTER TABLE quizzes ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
   END IF;
 
-  -- Add data column if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'quizzes' AND column_name = 'data') THEN
-    ALTER TABLE quizzes ADD COLUMN data JSONB;
+  -- Teachers table
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'teachers' AND table_schema = 'public') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'teachers' AND column_name = 'name') THEN
+      ALTER TABLE teachers ADD COLUMN name TEXT;
+    END IF;
   END IF;
 
-  -- Add created_at column if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'quizzes' AND column_name = 'created_at') THEN
-    ALTER TABLE quizzes ADD COLUMN created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'lessons' AND table_schema = 'public') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lessons' AND column_name = 'order_index') THEN
+      ALTER TABLE lessons ADD COLUMN order_index INTEGER DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'lessons' AND column_name = 'video_url') THEN
+      ALTER TABLE lessons ADD COLUMN video_url TEXT;
+    END IF;
+  END IF;
+
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'progress' AND table_schema = 'public') THEN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'progress' AND column_name = 'updated_at') THEN
+      ALTER TABLE progress ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
   END IF;
 END $$;
 
--- Add missing columns to other tables if needed
+-- Create indexes immediately after column additions (only if columns exist)
 DO $$
 BEGIN
-  -- Add order_index to sections if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'sections' AND column_name = 'order_index') THEN
-    ALTER TABLE sections ADD COLUMN order_index INTEGER DEFAULT 0;
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'is_active') THEN
+    CREATE INDEX IF NOT EXISTS idx_profiles_active ON profiles(is_active);
   END IF;
-
-  -- Add order_index to lessons if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'lessons' AND column_name = 'order_index') THEN
-    ALTER TABLE lessons ADD COLUMN order_index INTEGER DEFAULT 0;
-  END IF;
-
-  -- Add video_url to lessons if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'lessons' AND column_name = 'video_url') THEN
-    ALTER TABLE lessons ADD COLUMN video_url TEXT;
-  END IF;
-
-  -- Add updated_at columns if missing
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'courses' AND column_name = 'updated_at') THEN
-    ALTER TABLE courses ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'profiles' AND column_name = 'updated_at') THEN
-    ALTER TABLE profiles ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-  END IF;
-
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                 WHERE table_name = 'progress' AND column_name = 'updated_at') THEN
-    ALTER TABLE progress ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'is_archived') THEN
+    CREATE INDEX IF NOT EXISTS idx_profiles_archived ON profiles(is_archived);
   END IF;
 END $$;
 
 -- Enable RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE academic_years ENABLE ROW LEVEL SECURITY;
+ALTER TABLE grades ENABLE ROW LEVEL SECURITY;
+ALTER TABLE study_levels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE languages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE specialties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teachers ENABLE ROW LEVEL SECURITY;
@@ -298,30 +345,44 @@ ALTER TABLE parent_student_links ENABLE ROW LEVEL SECURITY;
 -- IMPROVED: Added error handling for policy creation
 DO $$
 BEGIN
-  -- Profiles: users can read/update their own
+  -- Profiles: users can read/update their own, admins can manage all
   DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
   DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
   DROP POLICY IF EXISTS "Admins can view all profiles" ON profiles;
   DROP POLICY IF EXISTS "Admins can update all profiles" ON profiles;
+  DROP POLICY IF EXISTS "Admins can insert profiles" ON profiles;
 
   CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
   CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
   CREATE POLICY "Admins can view all profiles" ON profiles FOR SELECT USING (public.is_admin(auth.uid()));
   CREATE POLICY "Admins can update all profiles" ON profiles FOR UPDATE USING (public.is_admin(auth.uid()));
+  CREATE POLICY "Admins can insert profiles" ON profiles FOR INSERT WITH CHECK (public.is_admin(auth.uid()) OR auth.role() = 'service_role');
 EXCEPTION WHEN OTHERS THEN
   RAISE NOTICE 'Error creating profiles policies: %', SQLERRM;
 END $$;
 
 DO $$
 BEGIN
-  -- Academic years: public read, admin can manage
-  DROP POLICY IF EXISTS "Public can view academic years" ON academic_years;
-  DROP POLICY IF EXISTS "Admins can manage academic years" ON academic_years;
+  -- Grades: public read, admin can manage
+  DROP POLICY IF EXISTS "Public can view grades" ON grades;
+  DROP POLICY IF EXISTS "Admins can manage grades" ON grades;
 
-  CREATE POLICY "Public can view academic years" ON academic_years FOR SELECT USING (true);
-  CREATE POLICY "Admins can manage academic years" ON academic_years FOR ALL USING (public.is_admin(auth.uid()));
+  CREATE POLICY "Public can view grades" ON grades FOR SELECT USING (true);
+  CREATE POLICY "Admins can manage grades" ON grades FOR ALL USING (public.is_admin(auth.uid()));
 EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'Error creating academic_years policies: %', SQLERRM;
+  RAISE NOTICE 'Error creating grades policies: %', SQLERRM;
+END $$;
+
+DO $$
+BEGIN
+  -- Study levels: public read, admin can manage
+  DROP POLICY IF EXISTS "Public can view study_levels" ON study_levels;
+  DROP POLICY IF EXISTS "Admins can manage study_levels" ON study_levels;
+
+  CREATE POLICY "Public can view study_levels" ON study_levels FOR SELECT USING (true);
+  CREATE POLICY "Admins can manage study_levels" ON study_levels FOR ALL USING (public.is_admin(auth.uid()));
+EXCEPTION WHEN OTHERS THEN
+  RAISE NOTICE 'Error creating study_levels policies: %', SQLERRM;
 END $$;
 
 DO $$
@@ -512,7 +573,7 @@ END $$;
 -- ============================================================================
 
 -- Courses indexes
-CREATE INDEX IF NOT EXISTS idx_courses_academic_year ON courses(academic_year_id);
+CREATE INDEX IF NOT EXISTS idx_courses_study_level ON courses(study_level_id);
 CREATE INDEX IF NOT EXISTS idx_courses_language ON courses(language_id);
 CREATE INDEX IF NOT EXISTS idx_courses_teacher ON courses(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_courses_published ON courses(is_published);
@@ -544,10 +605,11 @@ CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles(email);
 CREATE INDEX IF NOT EXISTS idx_teachers_profile ON teachers(profile_id);
 CREATE INDEX IF NOT EXISTS idx_teachers_active ON teachers(is_active);
 
--- Insert sample academic years
--- INSERT INTO academic_years (name, description) VALUES
--- ('2024-2025', 'Current academic year'),
--- ('2025-2026', 'Next academic year')
+-- Insert sample grades
+-- INSERT INTO grades (name, description, order_index) VALUES
+-- ('1st Year Baccalaureate', 'First year of baccalaureate', 1),
+-- ('2nd Year Baccalaureate', 'Second year of baccalaureate', 2),
+-- ('3rd Year Baccalaureate', 'Third year of baccalaureate', 3)
 -- ON CONFLICT DO NOTHING;
 
 -- Insert sample languages

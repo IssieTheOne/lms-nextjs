@@ -29,6 +29,7 @@ export default function LessonViewPage() {
   const router = useRouter()
   const courseId = params.courseId as string
   const lessonId = params.lessonId as string
+  const locale = params.locale as string
 
   const [lesson, setLesson] = useState<Lesson | null>(null)
   const [navigation, setNavigation] = useState<NavigationInfo>({})
@@ -60,7 +61,7 @@ export default function LessonViewPage() {
 
       if (!enrollment) {
         toast.error('You are not enrolled in this course')
-        router.push('/dashboard/student')
+        router.push(`/${locale}/dashboard/student`)
         return
       }
 
@@ -186,7 +187,7 @@ export default function LessonViewPage() {
   }
 
   const navigateToLesson = (lessonId: string) => {
-    router.push(`/dashboard/student/course/${courseId}/lesson/${lessonId}`)
+    router.push(`/${locale}/dashboard/student/course/${courseId}/lesson/${lessonId}`)
   }
 
   if (loading) {
@@ -214,7 +215,7 @@ export default function LessonViewPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/student/course/${courseId}`)}>
+          <Button variant="outline" onClick={() => router.push(`/${locale}/dashboard/student/course/${courseId}`)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Course
           </Button>

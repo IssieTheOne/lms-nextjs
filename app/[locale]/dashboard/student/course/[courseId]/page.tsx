@@ -43,6 +43,7 @@ export default function CourseViewPage() {
   const params = useParams()
   const router = useRouter()
   const courseId = params.courseId as string
+  const locale = params.locale as string
 
   const [course, setCourse] = useState<Course | null>(null)
   const [progress, setProgress] = useState<CourseProgress | null>(null)
@@ -72,7 +73,7 @@ export default function CourseViewPage() {
 
       if (enrollError || !enrollment) {
         toast.error('You are not enrolled in this course')
-        router.push('/dashboard/student')
+        router.push(`/${locale}/dashboard/student`)
         return
       }
 
@@ -157,7 +158,7 @@ export default function CourseViewPage() {
   }
 
   const startLesson = (lessonId: string) => {
-    router.push(`/dashboard/student/course/${courseId}/lesson/${lessonId}`)
+    router.push(`/${locale}/dashboard/student/course/${courseId}/lesson/${lessonId}`)
   }
 
   if (loading) {
@@ -184,7 +185,7 @@ export default function CourseViewPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={() => router.push('/dashboard/student')}>
+        <Button variant="outline" onClick={() => router.push(`/${locale}/dashboard/student`)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Dashboard
         </Button>

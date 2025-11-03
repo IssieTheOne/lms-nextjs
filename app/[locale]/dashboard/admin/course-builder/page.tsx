@@ -17,7 +17,6 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 interface Course {
   id: string
   name: string
-  academic_year?: { name: string } | null
   language?: { name: string } | null
 }
 
@@ -86,7 +85,6 @@ export default function CourseBuilderPage() {
         .select(`
           id,
           name,
-          academic_year:academic_years(name),
           language:languages(name)
         `)
         .order('name')
@@ -95,7 +93,6 @@ export default function CourseBuilderPage() {
 
       const formattedCourses = (data || []).map(course => ({
         ...course,
-        academic_year: Array.isArray(course.academic_year) ? course.academic_year[0] : course.academic_year,
         language: Array.isArray(course.language) ? course.language[0] : course.language
       }))
 
@@ -417,18 +414,55 @@ export default function CourseBuilderPage() {
           <CardDescription>Choose a course to build or edit its structure</CardDescription>
         </CardHeader>
         <CardContent>
-          <Select value={selectedCourse} onValueChange={setSelectedCourse}>
-            <SelectTrigger className="w-full max-w-md">
-              <SelectValue placeholder="Select a course" />
-            </SelectTrigger>
-            <SelectContent>
+          <div className="space-y-4">
+            <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+              <SelectTrigger className="w-full max-w-md">
+                <SelectValue placeholder="Select a course" />
+              </SelectTrigger>
+              <SelectContent>
+                {courses.map((course) => (
+                  <SelectItem key={course.id} value={course.id}>
+                    {course.name} ({course.language?.name})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Course Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {courses.map((course) => (
-                <SelectItem key={course.id} value={course.id}>
-                  {course.name} - {course.academic_year?.name} ({course.language?.name})
-                </SelectItem>
+                <Card key={course.id} className={`cursor-pointer transition-all hover:shadow-md ${
+                  selectedCourse === course.id ? 'ring-2 ring-blue-500' : ''
+                }`}>
+                  <CardContent className="p-4">
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className="font-semibold text-sm">{course.name}</h4>
+                        <p className="text-xs text-muted-foreground">{course.language?.name}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={selectedCourse === course.id ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedCourse(course.id)}
+                          className="flex-1"
+                        >
+                          Edit Here
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/en/dashboard/admin/course/${course.id}`, '_blank')}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
-            </SelectContent>
-          </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

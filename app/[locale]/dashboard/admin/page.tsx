@@ -287,8 +287,8 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="space-y-2">
               <Button asChild variant="outline" size="sm" className="w-full">
-                <Link href="/en/dashboard/admin/academic-years">
-                  Academic Years
+                <Link href="/en/dashboard/admin/study-levels">
+                  Study Levels
                 </Link>
               </Button>
               <Button asChild variant="outline" size="sm" className="w-full">

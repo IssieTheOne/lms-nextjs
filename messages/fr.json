@@ -21,5 +21,12 @@
     "parent": "Tableau de bord Parent",
     "logout": "Déconnexion",
     "role": "Rôle"
+  },
+  "admin": {
+    "studyLevels": "Niveaux d'Études",
+    "manageStudyLevels": "Gérer les Niveaux d'Études",
+    "addStudyLevel": "Ajouter un Niveau d'Études",
+    "studyLevelName": "Nom du Niveau d'Études",
+    "studyLevelDescription": "Description du Niveau d'Études"
   }
 }

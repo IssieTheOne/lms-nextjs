@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -50,6 +50,8 @@ export default function StudentDashboard() {
 
   const supabase = createClient()
   const router = useRouter()
+  const params = useParams()
+  const locale = params.locale as string
 
   useEffect(() => {
     fetchDashboardData()
@@ -315,7 +317,7 @@ export default function StudentDashboard() {
                             </span>
                             <Button
                               size="sm"
-                              onClick={() => router.push(`/dashboard/student/course/${course.id}`)}
+                              onClick={() => router.push(`/${locale}/dashboard/student/course/${course.id}`)}
                             >
                               View Course
                             </Button>
